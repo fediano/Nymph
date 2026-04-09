@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Fedogram</title>
+    <style>
+        :root { --tg-blue: #2b5278; --tg-dark: #0e1621; --tg-darker: #17212b; --tg-text: #f5f5f5; --tg-msg-in: #182533; --tg-accent: #5288c1; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; }
+        body { background: #000; height: 100vh; overflow: hidden; color: var(--tg-text); }
+        #auth-screen { position: fixed; inset: 0; z-index: 100; background: #0e1621; display: flex; justify-content: center; align-items: center; }
+        .auth-card { background: var(--tg-darker); padding: 40px; border-radius: 15px; width: 350px; text-align: center; }
+        .input-base { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #2a3947; background: #242f3d; color: white; outline: none; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--tg-accent); color: white; font-weight: bold; cursor: pointer; }
+        #app { display: none; height: 100vh; width: 100vw; display: flex; }
+        #sidebar { width: 320px; background: var(--tg-darker); border-right: 1px solid #000; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; display: flex; gap: 10px; align-items: center; }
+        .list-container { flex-grow: 1; overflow-y: auto; }
+        .item { padding: 10px 15px; display: flex; align-items: center; cursor: pointer; }
+        .item:hover { background: #202b36; }
+        .item-av { width: 48px; height: 48px; border-radius: 50%; margin-right: 15px; }
+        #chat-area { flex-grow: 1; display: flex; flex-direction: column; background: #0e1621 url('https://web.telegram.org/a/chat-bg-pattern-dark.png') repeat; background-size: 400px; position: relative; }
+        #chat-area::before { content: ""; position: absolute; inset: 0; background: rgba(14, 22, 33, 0.8); z-index: 0; }
+        #messages { position: relative; z-index: 1; flex-grow: 1; overflow-y: auto; padding: 20px 10%; display: flex; flex-direction: column; gap: 8px; }
+        .m { max-width: 65%; display: flex; flex-direction: column; position: relative; }
+        .m.mine { align-self: flex-end; }
+        .m.hers { align-self: flex-start; }
+        .m-bubble { padding: 8px 12px; border-radius: 12px; font-size: 15px; }
+        .mine .m-bubble { background: var(--tg-blue); border-bottom-right-radius: 3px; }
+        .hers .m-bubble { background: var(--tg-msg-in); border-bottom-left-radius: 3px; }
+        .input-box { position: relative; z-index: 1; padding: 15px 10%; background: var(--tg-darker); display: flex; align-items: center; gap: 15px; }
+        #msg-input { flex-grow: 1; background: #0e1621; border: 1px solid #2a3947; padding: 12px 15px; border-radius: 12px; color: white; outline: none; }
+    </style>
+</head>
+<body>
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h2 style="margin-bottom:20px; color:var(--tg-accent)">Fedogram Vercel</h2>
+            <input type="text" id="login" placeholder="Логин" class="input-base">
+            <input type="password" id="pass" placeholder="Пароль" class="input-base">
+            <button class="btn" onclick="doAuth()" id="auth-btn">Войти</button>
+            <p onclick="toggleReg()" id="reg-hint" style="margin-top:20px; font-size:14px; cursor:pointer; color:#7f91a4">Нет аккаунта? Создать</p>
+        </div>
+    </div>
+
+    <div id="app">
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <input type="text" placeholder="Поиск..." class="input-base" style="margin:0;">
+            </div>
+            <div class="list-container" id="sidebar-list"></div>
+        </div>
+        <div id="chat-area">
+            <div id="messages"></div>
+            <div class="input-box">
+                <input type="text" id="msg-input" placeholder="Написать сообщение...">
+                <button onclick="send()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--tg-accent)">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let me = '', myAv = '', isReg = false;
+        const defAv = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+
+        function toggleReg() {
+            isReg = !isReg;
+            document.getElementById('auth-btn').innerText = isReg ? 'Зарегистрироваться' : 'Войти';
+            document.getElementById('reg-hint').innerText = isReg ? 'Есть аккаунт? Войти' : 'Нет аккаунта? Создать';
+        }
+
+        async function doAuth() {
+            const u = document.getElementById('login').value, p = document.getElementById('pass').value;
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: isReg ? 'register' : 'login', username: u, password: p, avatar: '' })
+            });
+            const data = await res.json();
+            if (data.success) {
+                me = data.username; myAv = data.avatar || defAv;
+                document.getElementById('auth-screen').style.display = 'none';
+                document.getElementById('app').style.display = 'flex';
+                startPolling();
+            } else alert(data.error);
+        }
+
+        async function send() {
+            const text = document.getElementById('msg-input').value;
+            if (!text) return;
+            await fetch('/api/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: me, text, type: 'text' })
+            });
+            document.getElementById('msg-input').value = '';
+            refreshMessages();
+        }
+
+        async function refreshMessages() {
+            const res = await fetch('/api/messages');
+            const data = await res.json();
+            const box = document.getElementById('messages');
+            box.innerHTML = '';
+            data.forEach(m => {
+                const isMine = m.username === me;
+                const div = document.createElement('div');
+                div.className = `m ${isMine ? 'mine' : 'hers'}`;
+                div.innerHTML = `<div class="m-bubble"><b>${m.username}</b><br>${m.text}</div>`;
+                box.appendChild(div);
+            });
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function refreshUsers() {
+            const res = await fetch('/api/users');
+            const data = await res.json();
+            const list = document.getElementById('sidebar-list');
+            list.innerHTML = '';
+            data.forEach(u => {
+                if(u.username === me) return;
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.innerHTML = `<img src="${u.avatar || defAv}" class="item-av"><b>${u.username}</b>`;
+                list.appendChild(div);
+            });
+        }
+
+        function startPolling() {
+            refreshMessages();
+            refreshUsers();
+            setInterval(refreshMessages, 3000); // Обновление чата каждые 3 сек
+            setInterval(refreshUsers, 10000);
+        }
+
+        document.getElementById('msg-input').onkeydown = e => { if(e.key === 'Enter') send(); };
+    </script>
+</body>
+</html>
