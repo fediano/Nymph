@@ -1,10 +1,12 @@
 {
-  "name": "nymph-messenger",
+  "name": "nymph",
   "version": "1.0.0",
+  "description": "Nymph Messenger",
+  "main": "index.js",
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
     "@supabase/supabase-js": "^2.42.0",
-    "@supabase/supabase-client": "npm:@supabase/supabase-js@2.42.0"
+    "serverless-http": "^3.2.0"
   }
 }
