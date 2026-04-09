@@ -1,3 +1,4 @@
+const serverless = require('serverless-http');
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const app = express();
@@ -51,3 +52,4 @@ app.post('/api/send', async (req, res) => {
 });
 
 module.exports = app;
+module.exports.handler = serverless(app);
